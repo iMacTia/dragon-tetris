@@ -76,6 +76,11 @@ class Piece
     inside_grid_bounds?(x, y) && !overlapping?(x, y)
   end
 
+  def move_to(x, y)
+    @x = x
+    @y = y
+  end
+
   def move_left
     @x -= 1 if valid_position?(@x - 1, @y)
   end
@@ -176,12 +181,27 @@ class Grid
   end
 end
 
+class NextGrid
+  attr_reader :x_pos, :y_pos
+
+  def initialize
+    @x_pos = 900
+    @y_pos = 360
+  end
+
+  def render
+    $args.outputs.labels << [963, 530, "Next piece", 5, 1, *COLORS[:white]]
+    $args.outputs.borders << [x_pos - 2, y_pos - 2, 132, 132, 255, 255, 255]
+  end
+end
+
 class TetrisGame
-  attr_reader :grid, :current_piece, :score
+  attr_reader :grid, :next_grid, :current_piece, :next_piece, :score
 
   def initialize
     @score = 0
     @grid = Grid.new(10, 20)
+    @next_grid = NextGrid.new
     start_new_piece
   end
 
@@ -192,7 +212,9 @@ class TetrisGame
   def render
     render_background
     @grid.render
+    @next_grid.render
     @current_piece.render
+    @next_piece.render
   end
 
   def update
@@ -200,9 +222,11 @@ class TetrisGame
   end
 
   def start_new_piece
-    @current_piece = PIECES.sample.dup
-    @current_piece.add_to(@grid, 4, 20 - @current_piece.shape.length)
-    $game_over = @current_piece.overlapping?
+    @current_piece = @next_piece || PIECES.sample.dup
+    current_piece.add_to(grid, 4, 20 - current_piece.shape.length)
+    $game_over = current_piece.overlapping?
+    @next_piece = PIECES.sample.dup
+    next_piece.add_to(next_grid, 0, 3 - @next_piece.shape.length)
   end
 
   def plant_current_piece
