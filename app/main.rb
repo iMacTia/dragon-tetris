@@ -84,20 +84,23 @@ class Piece
     @x += 1 if valid_position?(@x + 1, @y)
   end
 
-  def update
-    unless touching?
-      keys = $args.inputs.keyboard
-      if (keys.key_down.down || keys.key_held.down)
-        @next_move -= 10
-      end
-      if keys.key_down.left
-        move_left
-      end
-      if keys.key_down.right && @x < @grid.cols - 1
-        move_right
-      end
+  def process_inputs
+    keys = $args.inputs.keyboard
+
+    if (keys.key_down.down || keys.key_held.down)
+      @next_move -= 10
     end
-    
+    if keys.key_down.left
+      move_left
+    end
+    if keys.key_down.right && @x < @grid.cols - 1
+      move_right
+    end
+  end
+
+  def update
+    process_inputs
+
     @next_move -= 1
 
     if @next_move <= 0
