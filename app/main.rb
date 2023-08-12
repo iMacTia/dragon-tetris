@@ -2,36 +2,74 @@ $gtk.reset
 
 def render_cube_in_grid(grid, x, y, color)
   $args.outputs.solids << [grid.x_pos + (x * 32), grid.y_pos + (y * 32), 32, 32, *color]
-  $args.outputs.borders << [grid.x_pos + (x * 32), grid.y_pos + (y * 32), 32, 32, 0, 0, 0]
+  $args.outputs.borders << [grid.x_pos + (x * 32), grid.y_pos + (y * 32), 32, 32, *COLORS[:black]]
 end
 
+COLORS = {
+  black: [0, 0, 0],
+  white: [255, 255, 255],
+  red: [255, 0, 0],
+  green: [0, 255, 0],
+  blue: [0, 0, 255],
+  yellow: [255, 255, 0],
+  orange: [255, 165, 0],
+  purple: [128, 0, 128],
+  cyan: [0, 255, 255]
+}
+
 class Piece
-  DELAY = 0.1.seconds
+  DELAY = 0.4.seconds
 
-  attr_reader :x, :y, :color
+  attr_reader :x, :y, :color, :shape
 
-  def initialize(grid, x, y, color)
+  def initialize(shape:, color:, grid: nil, x: 0, y: 0)
     @grid = grid
     @x = x
     @y = y
     @color = color
+    @shape = shape
     @next_move = DELAY
   end
 
-  def render
-    render_cube_in_grid(@grid, @x, @y, @color)
+  def add_to(grid, start_x, start_y)
+    @grid = grid
+    @x = start_x
+    @y = start_y
   end
 
-  def current_piece_colliding?
-    return @y == 0 || @grid.filled?(@x, @y-1)
+  def each_cell(x = @x, y = @y, &block)
+    shape.each_with_index do |row, col_index|
+      row.each_with_index do |cell, row_index|
+        yield(cell, x + row_index, y + col_index, row_index, col_index)
+      end
+    end
+  end
+
+  def each_filled_cell(x = @x, y = @y, &block)
+    each_cell do |cell, row_index_in_grid, col_index_in_grid, row_index, col_index|
+      yield(cell, x + row_index, y + col_index, row_index, col_index) if cell == 1
+    end
+  end
+
+  def touching?
+    each_filled_cell do |cell, row_index_in_grid, col_index_in_grid|
+      return true if col_index_in_grid == 0 || @grid.filled?(row_index_in_grid, col_index_in_grid-1)
+    end
+    false
   end
 
   def inside_grid_bounds?(x, y)
-    x >= 0 && x <= @grid.cols - 1
+    each_filled_cell(x, y) do |cell, row_index_in_grid, col_index_in_grid|
+      return false if row_index_in_grid < 0 || row_index_in_grid >= @grid.cols
+    end
+    true
   end
 
-  def overlapping?(x, y)
-    @grid.filled?(x, y)
+  def overlapping?(x = @x, y = @y)
+    each_filled_cell(x, y) do |cell, row_index_in_grid, col_index_in_grid|
+      return true if @grid.filled?(row_index_in_grid, col_index_in_grid)
+    end
+    false
   end
 
   def valid_position?(x, y)
@@ -50,14 +88,14 @@ class Piece
     @next_move -= 1
 
     if @next_move <= 0
-      $args.state.game.plant_current_piece if current_piece_colliding?
+      $args.state.game.plant_current_piece if touching?
       @y -= 1 if valid_position?(@x, @y - 1)
       @next_move = DELAY
     end
     
-    unless current_piece_colliding?
+    unless touching?
       keys = $args.inputs.keyboard
-      if (keys.key_down.down || keys.key_held.down) && @y > 0
+      if (keys.key_down.down || keys.key_held.down)
         @next_move -= 10
       end
       if keys.key_down.left
@@ -66,6 +104,12 @@ class Piece
       if keys.key_down.right && @x < @grid.cols - 1
         move_right
       end
+    end
+  end
+
+  def render
+    each_cell do |cell, row_index_in_grid, col_index_in_grid, row_index, col_index|
+      render_cube_in_grid(@grid, row_index_in_grid, col_index_in_grid, @color) if cell == 1
     end
   end
 end
@@ -87,12 +131,12 @@ class Grid
     !@tiles[y][x].nil?
   end
 
-  def place(piece)
-    @tiles[piece.y][piece.x] = piece.color
+  def plant(piece)
+    piece.each_filled_cell do |cell, row_index_in_grid, col_index_in_grid|
+      @tiles[col_index_in_grid][row_index_in_grid] = piece.color
+    end
   end
 
-  # check if any row in the grid is full.
-  # if it is, delete the row and shift all rows above it down by 1
   def update
     @tiles.each_with_index do |row, row_index|
       if row.all? { |cell| !cell.nil? }
@@ -113,6 +157,8 @@ class Grid
 end
 
 class TetrisGame
+  attr_reader :grid, :current_piece, :score
+
   def initialize
     @score = 0
     @grid = Grid.new(10, 20)
@@ -134,18 +180,16 @@ class TetrisGame
   end
 
   def start_new_piece
-    @current_piece = Piece.new(@grid, 4, 19, [255, 0, 0])
+    @current_piece = PIECES.sample.dup
+    @current_piece.add_to(@grid, 4, 20 - @current_piece.shape.length)
+    $game_over = @current_piece.overlapping?
   end
 
   def plant_current_piece
-    @grid.place(@current_piece)
+    @grid.plant(@current_piece)
     
-    if @current_piece.y >= 19
-      $game_over = true
-    else
-      @grid.update
-      start_new_piece
-    end
+    @grid.update
+    start_new_piece
   end
 
   def tick
@@ -157,6 +201,16 @@ class TetrisGame
     end
   end
 end
+
+PIECES = [
+  Piece.new(shape: [[0, 0, 0], [1, 1, 1], [0, 1, 0]], color: COLORS[:red]), # T
+  Piece.new(shape: [[1, 1], [1, 1]], color: COLORS[:yellow]), # O
+  Piece.new(shape: [[0, 0, 0], [0, 1, 1], [1, 1, 0]], color: COLORS[:green]), # S
+  Piece.new(shape: [[0, 0, 0], [1, 1, 0], [0, 1, 1]], color: COLORS[:blue]), # Z
+  Piece.new(shape: [[0, 0, 0, 0], [0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0]], color: COLORS[:orange]), # I
+  Piece.new(shape: [[0, 0, 0], [1, 1, 1], [0, 0, 1]], color: COLORS[:purple]), # J
+  Piece.new(shape: [[0, 0, 0], [1, 1, 1], [1, 0, 0]], color: COLORS[:cyan]) # L
+]
 
 def tick(args)
   $args = args
@@ -176,4 +230,6 @@ def tick(args)
       $paused = !$paused 
     end
   end
+
+  $gtk.reset if args.inputs.keyboard.key_down.r
 end
