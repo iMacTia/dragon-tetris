@@ -1,0 +1,22 @@
+[project]
+# The name of your game's executable. This should only contain a-z, A-Z, 0-9, _ or -.
+name = "DragonTetris"
+# The game's title. This will show up in the tile bar of your executable.
+title = "DragonTetris"
+version = "0.1.0"
+authors = ["Mattia Giuffrida"]
+icon = "metadata/icon.png"
+compile_ruby = false
+
+[dragonruby]
+version = "5.5"
+edition = "standard"
+
+[dependencies]
+
+[itch]
+# The Project URL you set when you created the game on Itch.io. https://my-username.itch.io/my-game.
+# This will also be the name of your build files, so fill it out even if you aren't uploading to Itch.io.
+url = "https://imactia.itch.io/dragon-tetris"
+# Your username on Itch.io.
+username = "iMacTia"
