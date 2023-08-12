@@ -85,14 +85,6 @@ class Piece
   end
 
   def update
-    @next_move -= 1
-
-    if @next_move <= 0
-      $args.state.game.plant_current_piece if touching?
-      @y -= 1 if valid_position?(@x, @y - 1)
-      @next_move = DELAY
-    end
-    
     unless touching?
       keys = $args.inputs.keyboard
       if (keys.key_down.down || keys.key_held.down)
@@ -104,6 +96,14 @@ class Piece
       if keys.key_down.right && @x < @grid.cols - 1
         move_right
       end
+    end
+    
+    @next_move -= 1
+
+    if @next_move <= 0
+      $args.state.game.plant_current_piece if touching?
+      @y -= 1 if valid_position?(@x, @y - 1)
+      @next_move = DELAY
     end
   end
 
