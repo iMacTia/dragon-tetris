@@ -84,8 +84,24 @@ class Piece
     @x += 1 if valid_position?(@x + 1, @y)
   end
 
+  def rotate_left
+    new_shape = Array.new(@shape[0].length) { Array.new(@shape.length, 0) }
+    @shape.each_with_index do |row, row_index|
+      row.each_with_index do |cell, col_index|
+        new_shape[col_index][row.length - row_index - 1] = cell
+      end
+    end
+    
+    # test new shape
+    old_shape = @shape
+    @shape = new_shape
+    @shape = old_shape unless valid_position?(@x, @y)
+  end
+
   def process_inputs
     keys = $args.inputs.keyboard
+
+    rotate_left if keys.key_down.z
 
     if (keys.key_down.down || keys.key_held.down)
       @next_move -= 10
@@ -143,10 +159,11 @@ class Grid
   def update
     @tiles.each_with_index do |row, row_index|
       if row.all? { |cell| !cell.nil? }
-        @tiles = @tiles[0...row_index] + @tiles[row_index+1..-1]
+        @tiles[row_index] = nil
         @tiles << Array.new(@cols, nil)
       end
     end
+    @tiles.compact!
   end
 
   def render
